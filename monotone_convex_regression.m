@@ -25,8 +25,9 @@ sup_domain = max(features) + tol;
 
 %% PROBLEM SETUP: Define the parameters and decision variables
 
-%k - number of features
+% N-number of data; k - number of features
 [N, k] = size(features); 
+% Create a 1xk vector of symbolic variables x, denoted as x = [x1, x2, ...,xk]
 x=sdpvar(1,k);
 
 % Define the main polynomial to be learned
@@ -34,26 +35,44 @@ x=sdpvar(1,k);
 % c is the array of the cofficients of the polynomial p
 % v is the array of monomials
 [p,c,v] = polynomial(x,degree);
+% e.g., x = [x1, x2], degree = 2
+% polynomial: p = c1*x1^2 + c2*x1*x2 + c3*x2^2 + c4*x1 + c5*x2 + c6
+% cofficients of the polynomial p: c = [c1; c2; c3; c4; c5; c6]
+% monomials in polynomial p: v = [x1^2; x1*x2; x2^2; x1; x2; 1]
 
 %% PROBLEM SETUP: Write the objective
 % currently computing the objective is the biggest computational bottleneck
 % I tried to vectorized versions, but they lead to errors
 
 monom_bulk = bulkeval(v,x,features'); % <- evaluates all monomials for all values of the features
-% >> monom_bulk
-% monom_bulk =
-%   Columns 1 through 12
-%     1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000    1.0000
-%     1.2557    1.2344    1.8156    1.0297    1.1742    1.9453    0.5634    1.9594    0.7838    1.5007    1.3797    1.5127
-%     1.1101    1.5004    1.9006    1.7164    ... 
+%{ e.g., features = [1 2;
+            2 3;
+            3 4;
+            4 5;
+            5 6;
+            6 7;
+            7 8;
+            8 9;
+            9 10;
+            10 11]; 10 data 2 features %}
+%{ monom_bulk =      1     4     9    16    25    36    49    64    81   100
+     2     6    12    20    30    42    56    72    90   110
+     4     9    16    25    36    49    64    81   100   121
+     1     2     3     4     5     6     7     8     9    10
+     2     3     4     5     6     7     8     9    10    11
+     1     1     1     1     1     1     1     1     1     1
+  where monom_bulk is a matrix of 6 (number of monomials in p, i.e., number of v) * 10 (number of data) %}
 
 peval_bulk = c'*monom_bulk;% <- computes the value of the polynomial given the value of
                            %    the argument from future, as a function of
                            %    polynomial coefficients c
-% >> display(peval_bulk)
-%   Linear matrix variable 1x100 (full, real, 210 variables)
-% >> sdisplay(peval_bulk(1,1))
-%   c(1)+1.25567117866*c(2)+1.11009037263*c(3)+1.25576012277*c(4)+0.710383038904*c(5)+...
+%{  c' is the transpose of c, according to the above example:
+    c'=[c1, c2, c3, c4, c5, c6]
+    c'*monom_bulk = [ (c1*1 + c2*2 + c3*4 + c4*1 + c5*2 + c6*1),
+               (c1*4 + c2*6 + c3*9 + c4*2 + c5*3 + c6*1),
+               ...
+               (c1*100 + c2*110 + c3*121 + c4*10 + c5*11 + c6*1) ]
+    where each element represents the value of the polynomial p for each data %}
 
 diff_bulk = peval_bulk - response'; % <- computes the difference between
                                     %    the function value at the feature
@@ -61,6 +80,7 @@ diff_bulk = peval_bulk - response'; % <- computes the difference between
                                     %    function of c)
 h = norm(diff_bulk); % <- h is the minimization objective, the sum of 
                           %    squared errors
+                     % <- norm compute the L2 Norm
 
 %% PROBLEM SETUP: Define the decision variables used in the constraints
 
