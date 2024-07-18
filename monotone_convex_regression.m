@@ -22,6 +22,7 @@ yalmip('clear');
 tol = 0.001;
 inf_domain = min(features) - tol;
 sup_domain = max(features) + tol;
+% min or max default operation on rows, e.g., features is N*k matrix, and inf_domain is 1*k matrix, 
 
 %% PROBLEM SETUP: Define the parameters and decision variables
 
@@ -54,14 +55,16 @@ monom_bulk = bulkeval(v,x,features'); % <- evaluates all monomials for all value
             7 8;
             8 9;
             9 10;
-            10 11]; 10 data 2 features %}
+            10 11]; 10 data 2 features
+%}
 %{ monom_bulk =      1     4     9    16    25    36    49    64    81   100
      2     6    12    20    30    42    56    72    90   110
      4     9    16    25    36    49    64    81   100   121
      1     2     3     4     5     6     7     8     9    10
      2     3     4     5     6     7     8     9    10    11
      1     1     1     1     1     1     1     1     1     1
-  where monom_bulk is a matrix of 6 (number of monomials in p, i.e., number of v) * 10 (number of data) %}
+  where monom_bulk is a matrix of 6 (number of monomials in p, i.e., number of v) * 10 (number of data) 
+%}
 
 peval_bulk = c'*monom_bulk;% <- computes the value of the polynomial given the value of
                            %    the argument from future, as a function of
@@ -72,7 +75,8 @@ peval_bulk = c'*monom_bulk;% <- computes the value of the polynomial given the v
                (c1*4 + c2*6 + c3*9 + c4*2 + c5*3 + c6*1),
                ...
                (c1*100 + c2*110 + c3*121 + c4*10 + c5*11 + c6*1) ]
-    where each element represents the value of the polynomial p for each data %}
+    where each element represents the value of the polynomial p for each data
+%}
 
 diff_bulk = peval_bulk - response'; % <- computes the difference between
                                     %    the function value at the feature
@@ -87,31 +91,73 @@ h = norm(diff_bulk); % <- h is the minimization objective, the sum of
 %% Monotone
 % Create the monomials of the helper polynomials used in the 
 % MONOTONE constraints
-m_monomials = monolist(x, degree-2);
+m_monomials = monolist(x, degree-2); % <- as the elements of Hessian matrix of P slove the second-order partial derivative
+%{ m_monomials will contain all monomials of x with a degree of at most (degree-2)
+e.g., x = [x1, x2]; degree-2 = 2
+m_monomials = [1; x1; x2; x1^2; x1*x2; x2^2]
+%}
 
 % Define the coefficients of the matrix of helper polynomials
 % for the MONOTONE constraints
 m_coef_help = sdpvar(k*k, length(m_monomials));
+%{ Generate a symbolic variable matrix with k*k (as Hessian matrix of P contains k*k elements) rows and length(m_monomials) columns
+e.g., k*k=4, length(m_monomials)=6;
+m_coef_help = [ m11, m12, m13, m14, m15, m16;
+                m21, m22, m23, m24, m55, m26;
+                m31, m32, m33, m34, m35, m36;
+                m41, m42, m43, m44, m45, m46 ]
+%}
 
 % Create the matrix of helper polynomials 
 m_Q_help = m_coef_help*m_monomials;
-m_Q_help = reshape(m_Q_help, k, k, []);
+%{ according to the above example:
+m_Q_help = [ m11*1 + m12*x1 + m13*x2 + m14*x1^2 + m15*x1*x2 + m16*x2^2;
+  m21*1 + m22*x1 + m23*x2 + m24*x1^2 + m25*x1*x2 + m26*x2^2;
+  m31*1 + m32*x1 + m33*x2 + m34*x1^2 + m35*x1*x2 + m36*x2^2;
+  m41*1 + m42*x1 + m43*x2 + m44*x1^2 + m45*x1*x2 + m46*x2^2;]
+%}
+m_Q_help = reshape(m_Q_help, k, k, []); % <- The original matrix is reshaped into a k*k*n matrix, where n is automatically determined based on the original matrix size and k
+%{ according to the above example:
+m_Q_help = [ m11*1 + m12*x1 + m13*x2 + m14*x1^2 + m15*x1*x2 + m16*x2^2; m31*1 + m32*x1 + m33*x2 + m34*x1^2 + m35*x1*x2 + m36*x2^2;
+             m21*1 + m22*x1 + m23*x2 + m24*x1^2 + m25*x1*x2 + m26*x2^2; m41*1 + m42*x1 + m43*x2 + m44*x1^2 + m45*x1*x2 + m46*x2^2;]
+%}
 
 %% Convex
 % Create helper free variable for the CONVEX constraints
 y=sdpvar(1,k);
+% y = [y1, y2, ...,yk]
 
 % Create the monomials of the helper polynomials used in the constraints
 mono_degree = cat(2, repelem(degree-2, k), repelem(2, k));
+%{ 1. repelem(degree-2, k) generates a vector with k elements, each of which has the value degree-2
+e.g., degree-2=2, k=3 -> repelem(degree-2, k) = [2, 2 ,2]
+2. cat(dim, A, B) joins the arrays A and B along the dimension dim
+cat(2, repelem(degree-2, k), repelem(2, k)) -> [2, 2, 2, 2, 2, 2]
+%}
 % (the max degree associated with the helper variable is 2)
 c_monomials = monolist([x y], mono_degree);
+%{monolist([x y], mono_degree) generates all possible monomials, with the highest degree of variables [x,y] specified by the corresponding values in mono_degree
+e.g., x=[x1,x2], y=[y1,y2] ->[x,y]=[x1,x2,y1,y2]
+mono_degree = [2, 2, 2, 2]
+-> c_monomials = [1, x1, x2, y1, y2, x1^2, x1*x2, x1*y1, x1*y2, x2^2, x2*y1, x2*y2, y1^2, y1*y2, y2^2]
+%}
 
 % Define the coefficients of the array of helper polynomials
 % for the CONVEX constraint
 c_coef_help = sdpvar(k, length(c_monomials));
+%{e.g., k=3, length(c_monomials)=15
+c_coef_help = [c11, c12, c13, ..., c115;
+               c21, c22, c23, ..., c215;
+               c31, c32, c33, ..., c315]
+%}
 
 % Create an array of helper polynomials 
 c_Q_help = c_coef_help*c_monomials;
+%{c_Q_help = [
+  c11*1 + c12*x1 + c13*x2 + c14*y1 + c15*y2 + c16*x1^2 + c17*x1*x2 + c18*x1*y1 + c19*x1*y2 + c110*x2^2 + c111*x2*y1 + c112*x2*y2 + c113*y1^2 + c114*y1*y2 + c115*y2^2;
+  c21*1 + c22*x1 + c23*x2 + c24*y1 + c25*y2 + c26*x1^2 + c27*x1*x2 + c28*x1*y1 + c29*x1*y2 + c210*x2^2 + c211*x2*y1 + c212*x2*y2 + c213*y1^2 + c214*y1*y2 + c215*y2^2;
+  c31*1 + c32*x1 + c33*x2 + c34*y1 + c35*y2 + c36*x1^2 + c37*x1*x2 + c38*x1*y1 + c39*x1*y2 + c310*x2^2 + c311*x2*y1 + c312*x2*y2 + c313*y1^2 + c314*y1*y2 + c315*y2^2;]
+%}
 
 %% PROBLEM SETUP: Write the constraints
 t0 = tic();
