@@ -139,7 +139,7 @@ c_monomials = monolist([x y], mono_degree);
 %{monolist([x y], mono_degree) generates all possible monomials, with the highest degree of variables [x,y] specified by the corresponding values in mono_degree
 e.g., x=[x1,x2], y=[y1,y2] ->[x,y]=[x1,x2,y1,y2]
 mono_degree = [2, 2, 2, 2]
--> c_monomials = [1, x1, x2, y1, y2, x1^2, x1*x2, x1*y1, x1*y2, x2^2, x2*y1, x2*y2, y1^2, y1*y2, y2^2]
+-> c_monomials = [1; x1; x2; y1; y2; x1^2; x1*x2; x1*y1; x1*y2; x2^2; x2*y1; x2*y2; y1^2; y1*y2; y2^2]
 %}
 
 % Define the coefficients of the array of helper polynomials
@@ -160,10 +160,19 @@ c_Q_help = c_coef_help*c_monomials;
 %}
 
 %% PROBLEM SETUP: Write the constraints
-t0 = tic();
-F = [sos(m_Q_help), sos(c_Q_help)];
+t0 = tic(); % <- Start a timer
+F = [sos(m_Q_help), sos(c_Q_help)]; % <- A=[2,2;3,3], B=[4;4] -> [A,B]= [2,2,4;3,3,4]
+%{polynomial p(x) = x^4 + 2*x^2 + 1, sos(p) creates a constraint that ensures that p(x) is 'sum-of-squares'
+polynomial matrix M = [x^2 + 1, x; x, x^2 + 1], sos(M) creates a constraint that ensures that the matrix M is semi-positive definite
+%}
+
 % Add monotonicity constraints
 F = F+[sos(transpose(jacobian(p,x)).*monotone_profile - m_Q_help*transpose((x-inf_domain).*(sup_domain-x)))];
+%{-> jacobian calculates the symbolic Jacobian df/dx of a polynomial f(x)
+            e.g., x = sdpvar(1, 2), p = x(1)^2 + 3*x(1)*x(2) + x(2)^2 -> jacobian(p,x) = [2*x(1) + 3*x(2), 3*x(1) + 2*x(2)]
+-> transpose: Transpose the Jacobi matrix into a k x 1 column vector -> transpose(jacobian(p,x))= [2*x(1) + 3*x(2); 3*x(1) + 2*x(2)]
+-> .*: [2,2,4;3,3,4].*2=[4,4,8;6,6,8]
+%}
 % Add convexity constraints
 F = F+[sos(y*hessian(p,x)*transpose(y).*convex_sign-(x-inf_domain).*(sup_domain-x)*c_Q_help)];
 
