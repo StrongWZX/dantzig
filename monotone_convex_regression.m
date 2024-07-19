@@ -91,7 +91,7 @@ h = norm(diff_bulk); % <- h is the minimization objective, the sum of
 %% Monotone
 % Create the monomials of the helper polynomials used in the 
 % MONOTONE constraints
-m_monomials = monolist(x, degree-2); % <- as the elements of Hessian matrix of P slove the second-order partial derivative
+m_monomials = monolist(x, degree-2); % <- as the following (x-inf_domain).*(sup_domain-x) will prodive additonal 2 degree
 %{ m_monomials will contain all monomials of x with a degree of at most (degree-2)
 e.g., x = [x1, x2]; degree-2 = 2
 m_monomials = [1; x1; x2; x1^2; x1*x2; x2^2]
@@ -100,7 +100,8 @@ m_monomials = [1; x1; x2; x1^2; x1*x2; x2^2]
 % Define the coefficients of the matrix of helper polynomials
 % for the MONOTONE constraints
 m_coef_help = sdpvar(k*k, length(m_monomials));
-%{ Generate a symbolic variable matrix with k*k (as Hessian matrix of P contains k*k elements) rows and length(m_monomials) columns
+%{ Generate a symbolic variable matrix with k*k (the first k is the elementer number of following jacobian vector) rows and length(m_monomials) columns
+                                                the second k is the number of features
 e.g., k*k=4, length(m_monomials)=6;
 m_coef_help = [ m11, m12, m13, m14, m15, m16;
                 m21, m22, m23, m24, m55, m26;
