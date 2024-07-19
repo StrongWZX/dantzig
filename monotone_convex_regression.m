@@ -163,7 +163,6 @@ c_Q_help = c_coef_help*c_monomials;
 t0 = tic(); % <- Start a timer
 F = [sos(m_Q_help), sos(c_Q_help)]; % <- A=[2,2;3,3], B=[4;4] -> [A,B]= [2,2,4;3,3,4]
 %{polynomial p(x) = x^4 + 2*x^2 + 1, sos(p) creates a constraint that ensures that p(x) is 'sum-of-squares'
-polynomial matrix M = [x^2 + 1, x; x, x^2 + 1], sos(M) creates a constraint that ensures that the matrix M is semi-positive definite
 %}
 
 % Add monotonicity constraints
@@ -185,6 +184,10 @@ msg = "Setup time: " + setup_time + " seconds.";
 disp(msg);
 t1 = tic();
 [sol,m,B,residual]=solvesos(F, h, options, all_coef);
+%{The sum-of-squares decomposition gives p(x)=uT(x)Qu(x)=vT(x)v(x)
+1. [sol,u,Q] = solvesos(Constraints,Objective,options,decisionvariables), where Constraints is F=sos(p) -> obtain u and Q, u'*Q*u is the sos of p
+2. optimize(F); v = sosd(F), where F=sos(p) -> obtain v, and v'*v is the sos of p
+%}
 optimization_time = toc(t1);
 msg = "Optimization runtime: " + optimization_time + " seconds.";
 disp(msg);
